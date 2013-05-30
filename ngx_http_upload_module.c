@@ -3505,7 +3505,13 @@ static ngx_int_t upload_parse_content_disposition(ngx_http_upload_ctx_t *upload_
         
         filename_start += sizeof(FILENAME_STRING)-1;
 
-        filename_end = filename_start + strcspn(filename_start, "\"");
+        // Finding the end of a filename for files that contain a " is done by
+        // first seeing if we can file a field separator (;), otherwise just the
+        // last quote in the header
+        filename_end = strstr(filename_start, "\";");
+        if (!filename_end) {
+            filename_end = strrchr(filename_start, '"');
+        }
 
         if(*filename_end != '\"') {
             ngx_log_debug0(NGX_LOG_DEBUG_CORE, upload_ctx->log, 0,
