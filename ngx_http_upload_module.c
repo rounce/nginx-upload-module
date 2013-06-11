@@ -154,6 +154,8 @@ typedef struct {
     ngx_array_t                   *header_templates;
     ngx_flag_t                    forward_args;
     ngx_flag_t                    tame_arrays;
+    ngx_flag_t                    pass_methods_get_options;
+    ngx_flag_t                    allow_methods_put_patch;
     ngx_flag_t                    resumable_uploads;
     ngx_flag_t                    empty_field_names;
     size_t                        limit_rate;
@@ -611,6 +613,28 @@ static ngx_command_t  ngx_http_upload_commands[] = { /* {{{ */
        offsetof(ngx_http_upload_loc_conf_t, tame_arrays),
        NULL },
 
+    /*
+      * Specifies if PUT and PATCH requests should be accepts for file uploads
+      */
+     { ngx_string("upload_allow_methods_put_patch"),
+       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LMT_CONF|NGX_HTTP_LIF_CONF
+                         |NGX_CONF_FLAG,
+       ngx_conf_set_flag_slot,
+       NGX_HTTP_LOC_CONF_OFFSET,
+       offsetof(ngx_http_upload_loc_conf_t, allow_methods_put_patch),
+       NULL },
+
+    /*
+      * Specifies if GET and OPTIONS request should be forwarded to the upload_pass location
+      */
+     { ngx_string("upload_pass_methods_get_options"),
+       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LMT_CONF|NGX_HTTP_LIF_CONF
+                         |NGX_CONF_FLAG,
+       ngx_conf_set_flag_slot,
+       NGX_HTTP_LOC_CONF_OFFSET,
+       offsetof(ngx_http_upload_loc_conf_t, pass_methods_get_options),
+       NULL },
+
      /*
       * Specifies whether resumable uploads are allowed
       */
@@ -770,18 +794,86 @@ static ngx_int_t /* {{{ ngx_http_upload_handler */
 ngx_http_upload_handler(ngx_http_request_t *r)
 {
     ngx_http_upload_loc_conf_t  *ulcf;
-    ngx_http_upload_ctx_t     *u;
-    ngx_int_t                 rc;
+    ngx_http_upload_ctx_t       *u;
+    ngx_int_t                   rc;
 
-    if(r->method & NGX_HTTP_OPTIONS)
-        return ngx_http_upload_options_handler(r);
+    ngx_str_t                   uri;
+    ngx_uint_t                  flags;
+    ngx_str_t                   args;
 
-    if (!(r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH)))
-        return NGX_HTTP_NOT_ALLOWED;
+    // 0 = not allowed, 1 = ngx_http_upload_options_handler, 2 = direct to upload_pass, 3 = handle file upload
+    ngx_uint_t                  allowed;
 
     ulcf = ngx_http_get_module_loc_conf(r, ngx_http_upload_module);
-
     u = ngx_http_get_module_ctx(r, ngx_http_upload_module);
+
+    allowed = 0;
+
+    if (r->method & NGX_HTTP_POST) {
+        allowed = 3;
+    } else if (ulcf->allow_methods_put_patch && (r->method & (NGX_HTTP_PUT | NGX_HTTP_PATCH))) {
+        allowed = 3;
+    } else if (ulcf->pass_methods_get_options && (r->method & (NGX_HTTP_OPTIONS | NGX_HTTP_GET))) {
+        allowed = 2;
+    } else if (r->method & NGX_HTTP_OPTIONS) {
+        allowed = 1;
+    }
+
+    if (allowed == 0) {
+        return NGX_HTTP_NOT_ALLOWED;
+    }
+
+    if (allowed == 1) {
+        return ngx_http_upload_options_handler(r);
+    }
+
+    // Allow OPTIONS and GET requests to be forwarded onto the upload handler
+    if (allowed == 2) {
+        if (ulcf->url_cv) {
+            /* complex value */
+            if (ngx_http_complex_value(r, ulcf->url_cv, &uri) != NGX_OK) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+
+            if (uri.len == 0) {
+                ngx_log_error(NGX_LOG_ERR, r->connection->log, 0,
+                              "empty \"upload_pass\" (was: \"%V\")",
+                              &ulcf->url_cv->value);
+
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
+        } else {
+            /* simple value */
+            uri = ulcf->url;
+        }
+
+        if (ulcf->forward_args) {
+          args = r->args; /* forward the query args */
+        }
+        else {
+          args.len = 0;
+          args.data = NULL;
+        }
+
+        flags = 0;
+
+        if (ngx_http_parse_unsafe_uri(r, &uri, &args, &flags) != NGX_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        if(uri.len != 0 && uri.data[0] == '/') {
+            rc = ngx_http_internal_redirect(r, &uri, &args);
+        }
+        else{
+            rc = ngx_http_named_location(r, &uri);
+        }
+
+        if (rc == NGX_ERROR) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        return rc;
+    }
 
     if (u == NULL) {
         u = ngx_pcalloc(r->pool, sizeof(ngx_http_upload_ctx_t));
@@ -2069,6 +2161,8 @@ ngx_http_upload_create_loc_conf(ngx_conf_t *cf)
     conf->store_access = NGX_CONF_UNSET_UINT;
     conf->forward_args = NGX_CONF_UNSET;
     conf->tame_arrays = NGX_CONF_UNSET;
+    conf->pass_methods_get_options = NGX_CONF_UNSET;
+    conf->allow_methods_put_patch = NGX_CONF_UNSET;
     conf->resumable_uploads = NGX_CONF_UNSET;
     conf->empty_field_names = NGX_CONF_UNSET;
 
@@ -2151,6 +2245,16 @@ ngx_http_upload_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     if(conf->tame_arrays == NGX_CONF_UNSET) {
         conf->tame_arrays = (prev->tame_arrays != NGX_CONF_UNSET) ?
             prev->tame_arrays : 0;
+    }
+
+    if(conf->pass_methods_get_options == NGX_CONF_UNSET) {
+        conf->pass_methods_get_options = (prev->pass_methods_get_options != NGX_CONF_UNSET) ?
+            prev->pass_methods_get_options : 0;
+    }
+
+    if(conf->allow_methods_put_patch == NGX_CONF_UNSET) {
+        conf->allow_methods_put_patch = (prev->allow_methods_put_patch != NGX_CONF_UNSET) ?
+            prev->allow_methods_put_patch : 0;
     }
 
     if(conf->resumable_uploads == NGX_CONF_UNSET) {
