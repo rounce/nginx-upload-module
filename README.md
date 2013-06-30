@@ -24,22 +24,23 @@ documentation should be used for all other functionality:
  * [English](http://www.grid.net.ru/nginx/upload.en.html)
  * [Russian](http://www.grid.net.ru/nginx/upload.ru.html)
 
-### upload_pass_methods_get_options
+### upload_pass_other_methods
 
-This flag (`on`/`off`) configures the upload module to pass `GET` and `OPTIONS`
-requests on to the `upload_pass` location without processing them at all.
+This flag (`on`/`off`) configures the upload module to pass any requests that
+are not `POST`, `PUT` or `PATCH` on to the `upload_pass` location without
+processing them at all.
 
 The nginx-upload-module normally responds to `OPTIONS` requests with a
 hard-coded `200 OK` response, which does not allow applications to properly
 handle cross-domain `OPTIONS` requests.
 
-With this options turned on, your application code will be invoked for `OPTIONS`
-and `GET` requests, allowing for custom responses.
+With this option turned on, your application code will be invoked for `OPTIONS`
+requests, and all other methods such as `GET`, `DELETE` and `HEAD`.
 
 ```
 location /files {
 	upload_pass @my_handler;
-	upload_pass_methods_get_options on;
+	upload_pass_other_methods on;
 }
 ```
 

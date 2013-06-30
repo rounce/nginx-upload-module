@@ -1,3 +1,7 @@
+Version 2.2.1+veracross.2
+ * Renamed upload_pass_methods_get_options to upload_pass_other_methods and
+   changed it to pass all requests that are not POST, PUT or PATCH.
+
 Version 2.2.1+veracross.1
  * Added upload_pass_methods_get_options
  * Added upload_allow_methods_put_patch

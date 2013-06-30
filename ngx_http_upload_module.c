@@ -154,7 +154,7 @@ typedef struct {
     ngx_array_t                   *header_templates;
     ngx_flag_t                    forward_args;
     ngx_flag_t                    tame_arrays;
-    ngx_flag_t                    pass_methods_get_options;
+    ngx_flag_t                    pass_other_methods;
     ngx_flag_t                    allow_methods_put_patch;
     ngx_flag_t                    resumable_uploads;
     ngx_flag_t                    empty_field_names;
@@ -627,12 +627,12 @@ static ngx_command_t  ngx_http_upload_commands[] = { /* {{{ */
     /*
       * Specifies if GET and OPTIONS request should be forwarded to the upload_pass location
       */
-     { ngx_string("upload_pass_methods_get_options"),
+     { ngx_string("upload_pass_other_methods"),
        NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_HTTP_LMT_CONF|NGX_HTTP_LIF_CONF
                          |NGX_CONF_FLAG,
        ngx_conf_set_flag_slot,
        NGX_HTTP_LOC_CONF_OFFSET,
-       offsetof(ngx_http_upload_loc_conf_t, pass_methods_get_options),
+       offsetof(ngx_http_upload_loc_conf_t, pass_other_methods),
        NULL },
 
      /*
@@ -813,7 +813,7 @@ ngx_http_upload_handler(ngx_http_request_t *r)
         allowed = 3;
     } else if (ulcf->allow_methods_put_patch && (r->method & (NGX_HTTP_PUT | NGX_HTTP_PATCH))) {
         allowed = 3;
-    } else if (ulcf->pass_methods_get_options && (r->method & (NGX_HTTP_OPTIONS | NGX_HTTP_GET))) {
+    } else if (ulcf->pass_other_methods && !(r->method & (NGX_HTTP_POST | NGX_HTTP_PUT | NGX_HTTP_PATCH))) {
         allowed = 2;
     } else if (r->method & NGX_HTTP_OPTIONS) {
         allowed = 1;
@@ -2161,7 +2161,7 @@ ngx_http_upload_create_loc_conf(ngx_conf_t *cf)
     conf->store_access = NGX_CONF_UNSET_UINT;
     conf->forward_args = NGX_CONF_UNSET;
     conf->tame_arrays = NGX_CONF_UNSET;
-    conf->pass_methods_get_options = NGX_CONF_UNSET;
+    conf->pass_other_methods = NGX_CONF_UNSET;
     conf->allow_methods_put_patch = NGX_CONF_UNSET;
     conf->resumable_uploads = NGX_CONF_UNSET;
     conf->empty_field_names = NGX_CONF_UNSET;
@@ -2247,9 +2247,9 @@ ngx_http_upload_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
             prev->tame_arrays : 0;
     }
 
-    if(conf->pass_methods_get_options == NGX_CONF_UNSET) {
-        conf->pass_methods_get_options = (prev->pass_methods_get_options != NGX_CONF_UNSET) ?
-            prev->pass_methods_get_options : 0;
+    if(conf->pass_other_methods == NGX_CONF_UNSET) {
+        conf->pass_other_methods = (prev->pass_other_methods != NGX_CONF_UNSET) ?
+            prev->pass_other_methods : 0;
     }
 
     if(conf->allow_methods_put_patch == NGX_CONF_UNSET) {
