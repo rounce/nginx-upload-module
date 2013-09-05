@@ -790,6 +790,8 @@ static ngx_str_t  ngx_upload_field_part2 = { /* {{{ */
     (u_char*)"\"" CRLF CRLF
 }; /* }}} */
 
+static ngx_str_t  ngx_default_content_type = ngx_string("text/plain");
+
 static ngx_int_t /* {{{ ngx_http_upload_handler */
 ngx_http_upload_handler(ngx_http_request_t *r)
 {
@@ -3870,14 +3872,13 @@ static ngx_int_t upload_parse_request_headers(ngx_http_upload_ctx_t *upload_ctx,
 
     ulcf = ngx_http_get_module_loc_conf(upload_ctx->request, ngx_http_upload_module);
 
-    // Check whether Content-Type header is missing
+    // Check whether Content-Type header is missing and replace it with
+    // text/plain to support cross-domain requests in IE8-9
     if(headers_in->content_type == NULL) {
-        ngx_log_error(NGX_LOG_ERR, upload_ctx->log, ngx_errno,
-                      "missing Content-Type header");
-        return NGX_HTTP_BAD_REQUEST;
+        content_type = &ngx_default_content_type;
+    } else {
+        content_type = &headers_in->content_type->value;
     }
-
-    content_type = &headers_in->content_type->value;
 
     if(ngx_strncasecmp(content_type->data, (u_char*) MULTIPART_FORM_DATA_STRING,
         sizeof(MULTIPART_FORM_DATA_STRING) - 1)) {
