@@ -65,9 +65,8 @@ bug fixes.
 
 ## Nginx 1.3 and 1.4 Support
 
-Currently neither this version, nor the original nginx-upload-module support
-Nginx 1.3.9+. With version 1.3.9 quite a bit of the Nginx internals were
-rewritten to support chunked requests.
+This Version has been compiled successfully on Nginx 1.4.2. No attempt has
+been made to compile or test this version on any previous version of Nginx.
 
 See https://github.com/vkholodkov/nginx-upload-module/issues/41#issuecomment-15692917
 for the original author’s position on Nginx 1.3.9+ compatibility.
