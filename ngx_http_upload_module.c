@@ -4412,8 +4412,6 @@ static ngx_int_t upload_parse_request_headers(ngx_http_upload_ctx_t *upload_ctx,
         content_type = &headers_in->content_type->value;
     }
 
-    content_type = &headers_in->content_type->value;
-
     if(ngx_strncasecmp(content_type->data, (u_char*) MULTIPART_FORM_DATA_STRING,
         sizeof(MULTIPART_FORM_DATA_STRING) - 1)) {
 
