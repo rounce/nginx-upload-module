@@ -1,12 +1,5 @@
-Version 2.2.1+veracross.2
- * Renamed upload_pass_methods_get_options to upload_pass_other_methods and
-   changed it to pass all requests that are not POST, PUT or PATCH.
-
-Version 2.2.1+veracross.1
- * Added upload_pass_methods_get_options
- * Added upload_allow_methods_put_patch
- * Fixed bug: file uploads having filenames that contain an unescaped double
-   quote character are now properly parsed
+master (unreleased)
+* Added feature: http2 support. Thanks to Frankie Dintino.
 
 Version 2.2.1
  * Added feature: SHA-256 and SHA-512
