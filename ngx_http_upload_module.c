@@ -8,8 +8,6 @@
 #include <ngx_http.h>
 #include <nginx.h>
 
-#if nginx_version >= 1011002
-
 #include <ngx_md5.h>
 
 typedef ngx_md5_t MD5_CTX;
@@ -21,20 +19,6 @@ typedef ngx_md5_t MD5_CTX;
 #define MD5_DIGEST_LENGTH 16
 
 #include <openssl/sha.h>
-
-#else
-
-#if (NGX_HAVE_OPENSSL_MD5_H)
-#include <openssl/md5.h>
-
-#define  MD5Init    MD5_Init
-#define  MD5Update  MD5_Update
-#define  MD5Final   MD5_Final
-
-#include <openssl/sha.h>
-
-
-#endif
 
 #define MULTIPART_FORM_DATA_STRING              "multipart/form-data"
 #define BOUNDARY_STRING                         "boundary="
@@ -2977,7 +2961,6 @@ ngx_http_upload_pass_form_field(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
 #if (NGX_PCRE)
-#if defined nginx_version && nginx_version >= 8025
     ngx_memzero(&rc, sizeof(ngx_regex_compile_t));
 
     rc.pattern = value[1];
@@ -2992,25 +2975,6 @@ ngx_http_upload_pass_form_field(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     f->regex = rc.regex;
     f->ncaptures = rc.captures;
-#else
-    f->regex = ngx_regex_compile(&value[1], 0, cf->pool, &err);
-
-    if (f->regex == NULL) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "%s", err.data);
-        return NGX_CONF_ERROR;
-    }
-
-    n = ngx_regex_capture_count(f->regex);
-
-    if (n < 0) {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                           ngx_regex_capture_count_n " failed for "
-                           "pattern \"%V\"", &value[1]);
-        return NGX_CONF_ERROR;
-    }
-
-    f->ncaptures = n;
-#endif
 #else
     f->text.len = value[1].len;
     f->text.data = value[1].data;
