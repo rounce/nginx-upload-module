@@ -1603,6 +1603,11 @@ static ngx_int_t ngx_http_upload_start_handler(ngx_http_upload_ctx_t *u) { /* {{
             u->discard_data = 1;
     }
 
+
+    if(ngx_http_upload_add_headers(r, ulcf) != NGX_OK) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
     return NGX_OK;
 
 cleanup_file:
